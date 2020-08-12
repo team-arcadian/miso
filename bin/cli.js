@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 const path = require('path');
+const pkg = require('../package.json');
 
 const program = require('commander');
 const updateNotifier = require('update-notifier');
 
-const pkg = require('../package.json');
 const services = require('../lib/services');
 const Generator = require('../lib/generator');
-const { Logger } = require('../lib/utils');
 const VapidServer = require('../lib/runners/VapidServer');
 const VapidBuilder = require('../lib/runners/VapidBuilder');
 const VapidDeployer = require('../lib/runners/VapidDeployer');
+
+const { Logger } = require('../lib/utils');
+const { cosmiconfig } = require('cosmiconfig');
+
+const explorer = cosmiconfig('miso');
 
 function withVapid(command) {
   return async (target) => {
     try {
       const cwd = target instanceof program.Command ? process.cwd() : target;
-      const vapid = new VapidServer(cwd);
+      const { config: options = {} } = await explorer.search();
+
+      const vapid = new VapidServer(cwd, options);
 
       updateNotifier({ pkg }).notify({ isGlobal: true });
       await command(vapid);
@@ -80,7 +86,9 @@ program
   .description('deploy to Vapid\'s hosting service')
   .action(async (target) => {
     const cwd = typeof target !== 'string' ? process.cwd() : target;
-    const vapid = new VapidDeployer(cwd);
+    const { config: options = {} } = await explorer.search();
+
+    const vapid = new VapidDeployer(cwd, options);
     await vapid.deploy();
     process.exit(0);
   });
@@ -100,7 +108,9 @@ program
   .action(async (target, dest) => {
     const cwd = typeof target !== 'string' ? process.cwd() : target;
     const destDir = typeof dist !== 'string' ? path.join(process.cwd(), 'dist') : dest;
-    const vapid = new VapidBuilder(cwd);
+    const { config: options = {} } = await explorer.search();
+
+    const vapid = new VapidBuilder(cwd, options);
     await vapid.build(destDir);
     process.exit(0);
   });
